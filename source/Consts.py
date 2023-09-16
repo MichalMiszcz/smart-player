@@ -19,6 +19,9 @@ PLAYER_MOVEMENT_SLOWDOWN = 1.5
 GRAVITY = 1
 PLAYER_JUMP_SPEED = 20
 
+# RL constants
+NUMBER_OF_ACTIONS = 5
+
 
 # Player starting position
 PLAYER_START_X = 128
