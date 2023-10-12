@@ -64,11 +64,16 @@ class MyGame(arcade.Window):
 
         self.new_enemy = 0
 
+        self.previous_coin_distance = 10000
+        self.previous_spike_distance = 10000
+
         arcade.set_background_color(arcade.csscolor.CORNFLOWER_BLUE)
 
     def setup(self):
         self.camera = arcade.Camera(self.width, self.height)
         self.gui_camera = arcade.Camera(self.width, self.height)
+
+        self.previous_coin_distance = 10000
 
         if self.level <= Consts.NUMBER_OF_LEVELS:
             map_name = f"levels/Level{self.level}.json"
@@ -444,6 +449,34 @@ class MyGame(arcade.Window):
 
         self.center_camera_to_player()
 
+    def get_something_positions(self, layer):
+        coin_positions = []
+        coin_layer = self.scene[layer]
+
+        for coin_object in coin_layer:
+            # Calculate the position of each coin and add it to the list
+            cartesian = self.tile_map.get_cartesian(
+                coin_object.center_x, coin_object.center_y
+            )
+            coin_position = math.floor(
+                cartesian[0] * Consts.TILE_SCALING * self.tile_map.tile_width
+            )
+            coin_positions.append(coin_position)
+
+        return coin_positions
+
+    def calculate_nearest_something_distance(self, layer):
+        agent_pos = self.player_sprite.center_x
+        coin_positions = self.get_something_positions(layer)
+
+        if not coin_positions:
+            return float('inf')  # No coins present
+
+        # Calculate the distance to the nearest coin
+        nearest_coin_distance = min(abs(agent_pos - coin_pos) for coin_pos in coin_positions)
+
+        return nearest_coin_distance
+
     def get_height(self):
         return self.tile_map.height * Consts.SPRITE_PIXEL_SIZE
 
@@ -451,7 +484,22 @@ class MyGame(arcade.Window):
         return self.tile_map.height * Consts.SPRITE_PIXEL_SIZE
 
     def get_observation(self):
-        return {"agent": self.player_sprite.center_x, "target": self.end_of_map, "end": False}
+        agent_pos = self.player_sprite.center_x
+        target_pos = self.end_of_map
+        end = False
+
+        coin_positions = self.get_something_positions(Consts.LAYER_NAME_COINS)
+        spikes_positions = self.get_something_positions(Consts.LAYER_NAME_DONT_TOUCH)
+
+        coin_observation = [1 if agent_pos in coin_positions else 0]
+        spikes_observation = [1 if agent_pos in spikes_positions else 0]
+        return {
+            "agent": agent_pos,
+            "target": target_pos,
+            "end": end,
+            "coins": coin_observation,  # Include coin information in the observation
+            "spikes": spikes_observation  # Include spikes information in the observation
+        }
 
     def get_info(self):
         return {"distance": np.linalg.norm(self.player_sprite.center_x - self.end_of_map)}
@@ -462,26 +510,69 @@ class MyGame(arcade.Window):
 
         if self.died:
             self.died = False
-            reward += -100000
+            reward += -15
 
-        if self.score > self.old_score:
-            self.old_score = self.score
-            reward += 100000
+        # if self.score > self.old_score:
+        #     self.old_score = self.score
+        #     reward += 200
 
         # print(self.player_sprite.center_x)
         if self.max_x > self.player_sprite.center_x:
-            reward += -1
+            reward += -10
         elif self.max_x == self.player_sprite.center_x:
-            reward += -500
+            reward += -20
         elif self.max_x < self.player_sprite.center_x:
             self.max_x = self.player_sprite.center_x
             reward += 5
 
         if self.player_sprite.center_x >= self.end_of_map - 10:
-            reward += 100000
+            reward += 20
+
+        # Calculate the distance to the nearest coin
+        nearest_coin_distance = self.calculate_nearest_something_distance(Consts.LAYER_NAME_COINS)
+
+        # Define reward components for moving towards/away from coins
+        reward_near_coin = 30  # Reward for getting closer to coins
+        reward_away_coin = -10  # Penalty for moving away from coins
+
+        # Calculate the reward based on the change in distance to the nearest coin
+        delta_distance = self.previous_coin_distance - nearest_coin_distance
+
+        # Determine if the agent is moving closer to or away from coins
+        if delta_distance > 0:
+            reward += reward_near_coin
+        elif delta_distance == 0:
+            reward += -20
+        else:
+            reward += reward_away_coin
+
+        # Update the previous coin distance for the next step
+        self.previous_coin_distance = nearest_coin_distance
+
+        # Calculate the distance to the nearest coin
+        nearest_spikes_distance = self.calculate_nearest_something_distance(Consts.LAYER_NAME_DONT_TOUCH)
+
+        # Define reward components for moving towards/away from coins
+        reward_near_spikes = -1000  # Reward for getting closer to coins
+        reward_away_spikes = 10  # Penalty for moving away from coins
+
+        # Calculate the reward based on the change in distance to the nearest coin
+        delta_distance = self.previous_spike_distance - nearest_spikes_distance
+
+        # Determine if the agent is moving closer to or away from coins
+        if abs(delta_distance) > 20:
+            reward += reward_near_spikes
+        elif delta_distance == 0:
+            reward += -20
+        else:
+            reward += reward_away_spikes
+
+        # Update the previous coin distance for the next step
+        self.previous_spike_distance = nearest_spikes_distance
+
+        # print(self.previous_coin_distance)
 
         return reward
-
 
     def is_done(self):
         return False

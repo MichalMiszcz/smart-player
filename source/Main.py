@@ -23,7 +23,7 @@ def main():
 
     env = gym.make('CustomGame-v0')
     # env.set_window(window)
-    env.set_epsilon(0.5)
+    env.set_epsilon(0.2)
     info = env.reset()
     done = False
     do = 1
@@ -40,6 +40,7 @@ def main():
         # print(reward)
         env.render()
         end_time = time.perf_counter()
+
         frame_time = abs(0.016 - (end_time - start_time))
         # print(frame_time)
         # time.sleep(frame_time)
@@ -54,7 +55,7 @@ def main():
                 do = 4
 
             i += 1
-            print(i)
+            # print(i)
 
         if i > 1000:
             info = env.reset()
