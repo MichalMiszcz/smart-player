@@ -25,6 +25,8 @@ class MyGame(arcade.Window):
         # self.set_update_rate(1/60)
 
         self.end = False
+        self.time = 0
+        self.is_done = False
         self.max_x = 0
         self.tile_map = None
         self.scene = None
@@ -66,6 +68,7 @@ class MyGame(arcade.Window):
 
         self.previous_coin_distance = 10000
         self.previous_spike_distance = 10000
+        self.previous_position = 128
 
         arcade.set_background_color(arcade.csscolor.CORNFLOWER_BLUE)
 
@@ -73,6 +76,8 @@ class MyGame(arcade.Window):
         self.level = 1
         self.camera = arcade.Camera(self.width, self.height)
         self.gui_camera = arcade.Camera(self.width, self.height)
+
+        self.is_done = False
 
         self.previous_coin_distance = 10000
 
@@ -119,7 +124,7 @@ class MyGame(arcade.Window):
         self.player_sprite.center_y = Consts.PLAYER_START_Y
         self.scene.add_sprite(Consts.LAYER_NAME_PLAYER, self.player_sprite)
 
-        self.max_x = Consts.PLAYER_START_X
+        # self.max_x = Consts.PLAYER_START_X
 
         # variable for detecting if player ended the level
         self.end_of_map = (self.tile_map.width - 5) * Consts.GRID_PIXEL_SIZE
@@ -258,20 +263,27 @@ class MyGame(arcade.Window):
     def players_death(self):
         self.died = True
 
-        if self.death() == 1:
-            self.setup()
-            # self.player_sprite.change_x = 0
-            # self.player_sprite.change_y = 0
-            # self.player_sprite.center_x = Consts.PLAYER_START_X
-            # self.player_sprite.center_y = Consts.PLAYER_START_Y
-            # arcade.play_sound(self.lose)
-        else:
-            self.level = 1
-            # game_over = UI.GameOverView()
-            # self.window.show_view(game_over)
-            # arcade.play_sound(self.game_over)
+        self.is_done = True
+
+        # if self.death() == 1:
+        #     self.setup()
+        #     # self.player_sprite.change_x = 0
+        #     # self.player_sprite.change_y = 0
+        #     # self.player_sprite.center_x = Consts.PLAYER_START_X
+        #     # self.player_sprite.center_y = Consts.PLAYER_START_Y
+        #     # arcade.play_sound(self.lose)
+        # else:
+        #     self.level = 1
+        #     # game_over = UI.GameOverView()
+        #     # self.window.show_view(game_over)
+        #     # arcade.play_sound(self.game_over)
 
     def on_update(self, delta_time):
+
+        self.time += 1
+        # print(self.time)
+        # if self.time > Consts.RESET_TIME:
+        #     self.reset = True
 
         # Enemies
         self.new_enemy += 1
@@ -498,12 +510,15 @@ class MyGame(arcade.Window):
             "agent": agent_pos,
             "target": target_pos,
             "end": self.end,
-            "coins": coin_observation,  # Include coin information in the observation
-            "spikes": spikes_observation  # Include spikes information in the observation
+            # "coins": coin_observation,  # Include coin information in the observation
+            # "spikes": spikes_observation  # Include spikes information in the observation
         }
 
     def get_info(self):
-        return {"distance": np.linalg.norm(self.player_sprite.center_x - self.end_of_map)}
+        return {"info": False}
+
+
+        # return {"distance": np.linalg.norm(self.player_sprite.center_x - self.end_of_map)}
 
     def get_reward(self):
 
@@ -511,7 +526,7 @@ class MyGame(arcade.Window):
 
         if self.died:
             self.died = False
-            reward += -15
+            reward += -2
 
         # if self.score > self.old_score:
         #     self.old_score = self.score
@@ -519,57 +534,62 @@ class MyGame(arcade.Window):
 
         # print(self.player_sprite.center_x)
         if self.max_x > self.player_sprite.center_x:
-            reward += -10
-        elif self.max_x == self.player_sprite.center_x:
-            reward += -20
+            reward += -5
         elif self.max_x < self.player_sprite.center_x:
             self.max_x = self.player_sprite.center_x
             reward += 5
 
+        if self.previous_position > self.player_sprite.center_x:
+            reward += -5
+        elif self.previous_position < self.player_sprite.center_x:
+            reward += 15
+        else:
+            reward += -200
+
         if self.player_sprite.center_x >= self.end_of_map - 10:
-            reward += 20
+            reward += 200
 
-        # Calculate the distance to the nearest coin
-        nearest_coin_distance = self.calculate_nearest_something_distance(Consts.LAYER_NAME_COINS)
+        # # Calculate the distance to the nearest coin
+        # nearest_coin_distance = self.calculate_nearest_something_distance(Consts.LAYER_NAME_COINS)
+        #
+        # # Define reward components for moving towards/away from coins
+        # reward_near_coin = 30  # Reward for getting closer to coins
+        # reward_away_coin = -10  # Penalty for moving away from coins
+        #
+        # # Calculate the reward based on the change in distance to the nearest coin
+        # delta_distance = self.previous_coin_distance - nearest_coin_distance
+        #
+        # # Determine if the agent is moving closer to or away from coins
+        # if delta_distance > 0:
+        #     reward += reward_near_coin
+        # elif delta_distance == 0:
+        #     reward += -20
+        # else:
+        #     reward += reward_away_coin
+        #
+        # # Update the previous coin distance for the next step
+        # self.previous_coin_distance = nearest_coin_distance
 
-        # Define reward components for moving towards/away from coins
-        reward_near_coin = 30  # Reward for getting closer to coins
-        reward_away_coin = -10  # Penalty for moving away from coins
-
-        # Calculate the reward based on the change in distance to the nearest coin
-        delta_distance = self.previous_coin_distance - nearest_coin_distance
-
-        # Determine if the agent is moving closer to or away from coins
-        if delta_distance > 0:
-            reward += reward_near_coin
-        elif delta_distance == 0:
-            reward += -20
-        else:
-            reward += reward_away_coin
-
-        # Update the previous coin distance for the next step
-        self.previous_coin_distance = nearest_coin_distance
-
-        # Calculate the distance to the nearest coin
-        nearest_spikes_distance = self.calculate_nearest_something_distance(Consts.LAYER_NAME_DONT_TOUCH)
-
-        # Define reward components for moving towards/away from coins
-        reward_near_spikes = -1000  # Reward for getting closer to coins
-        reward_away_spikes = 10  # Penalty for moving away from coins
-
-        # Calculate the reward based on the change in distance to the nearest coin
-        delta_distance = self.previous_spike_distance - nearest_spikes_distance
-
-        # Determine if the agent is moving closer to or away from coins
-        if abs(delta_distance) > 20:
-            reward += reward_near_spikes
-        elif delta_distance == 0:
-            reward += -20
-        else:
-            reward += reward_away_spikes
-
-        # Update the previous coin distance for the next step
-        self.previous_spike_distance = nearest_spikes_distance
+        # # Calculate the distance to the nearest coin
+        # nearest_spikes_distance = self.calculate_nearest_something_distance(Consts.LAYER_NAME_DONT_TOUCH)
+        #
+        # # Define reward components for moving towards/away from coins
+        # reward_near_spikes = -1  # Reward for getting closer to coins
+        # reward_away_spikes = 1  # Penalty for moving away from coins
+        #
+        # # Calculate the reward based on the change in distance to the nearest coin
+        # delta_distance = self.previous_spike_distance - nearest_spikes_distance
+        #
+        # # Determine if the agent is moving closer to or away from coins
+        # if abs(delta_distance) > 20:
+        #     reward += reward_near_spikes
+        # elif delta_distance == 0:
+        #     reward += -1
+        # else:
+        #     reward += reward_away_spikes
+        #
+        # # Update the previous coin distance for the next step
+        # self.previous_spike_distance = nearest_spikes_distance
 
         # print(self.previous_coin_distance)
 
@@ -578,8 +598,8 @@ class MyGame(arcade.Window):
 
         return reward
 
-    def is_done(self):
-        return False
+    def done(self):
+        return self.is_done
 
 
 class CustomGameEnvironment(gym.Env):
@@ -596,8 +616,8 @@ class CustomGameEnvironment(gym.Env):
                 "agent": spaces.Box(0, 6144, shape=(2,), dtype=float),
                 "target": spaces.Box(0, 6144, shape=(2,), dtype=float),
                 "end": spaces.Discrete(2),
-                "coins": spaces.Box(0, 1, shape=(1,), dtype=int),  # Include coin information in the observation
-                "spikes": spaces.Box(0, 1, shape=(1,), dtype=int)  # Include spikes information in the observation
+                # "coins": spaces.Box(0, 1, shape=(1,), dtype=int),  # Include coin information in the observation
+                # "spikes": spaces.Box(0, 1, shape=(1,), dtype=int)  # Include spikes information in the observation
             }
         )
 
@@ -605,13 +625,13 @@ class CustomGameEnvironment(gym.Env):
 
         # self.window = None
 
-        self.epsilon = 0
+        # self.epsilon = 0.1
         self.q_values = defaultdict(lambda: np.zeros(5))
-        self.max_iterations = 20000
+        self.max_iterations = 1000
         self.iterations = 0
 
-    def set_epsilon(self, epsilon):
-        self.epsilon = epsilon
+    # def set_epsilon(self, epsilon):
+    #     self.epsilon = epsilon
 
     # def set_window(self, window):
     #     self.window = window
@@ -623,14 +643,15 @@ class CustomGameEnvironment(gym.Env):
         # Get observation, reward, done, info from the game
         observation = self.game.get_observation()
         reward = self.game.get_reward()
-        done = self.game.is_done()
+        done = self.game.done()
         info = self.game.get_info()  # Additional information, if needed
 
         self.iterations += 1
+        # print(reward)
 
-        # if self.iterations > self.max_iterations:
-        #     print("reset")
-        #     # self.reset()
+        if self.iterations > self.max_iterations:
+            print("reset")
+            self.game.is_done = True
 
         return observation, reward, done, info
 
@@ -644,9 +665,9 @@ class CustomGameEnvironment(gym.Env):
 
         return observation, info
 
-    def render(self, mode='human'):
+    def render(self, mode='human', ):
         self.game.dispatch_events()
-        self.game._dispatch_updates(60)
+        self.game._dispatch_updates(1)
         self.game.on_draw()  # Draw the frame
         self.game.flip()  # Display the frame
         # self.game.update(1/60)  # Update the game state
@@ -655,8 +676,8 @@ class CustomGameEnvironment(gym.Env):
         # Close any resources when done
         self.game.setup()
 
-    def get_action(self, do):
-        if np.random.random() < self.epsilon:
-            return np.random.randint(1, 6)
-        else:
-            return do
+    # def get_action(self, do):
+    #     if np.random.random() < self.epsilon:
+    #         return np.random.randint(1, 6)
+    #     else:
+    #         return do
