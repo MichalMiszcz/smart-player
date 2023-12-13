@@ -2,7 +2,7 @@ import time
 
 import arcade
 import arcade.gui
-import gymnasium as gym
+import gym
 
 import Consts
 import CustomGameEnvironment
@@ -21,10 +21,12 @@ def main():
     # window.show_view(game_view)
     # arcade.run()
 
+    # env = gym.make_vec('CustomGame-v0', 1)
     env = gym.make('CustomGame-v0')
+
     # env.set_window(window)
     env.set_epsilon(0.2)
-    info = env.reset()
+    observation, info = env.reset()
     done = False
     do = 1
     print(info["distance"])
@@ -58,7 +60,11 @@ def main():
             # print(i)
 
         if i > 1000:
-            info = env.reset()
+            observation, info = env.reset()
+            i = 0
+
+        if observation["end"]:
+            observation, info = env.reset()
             i = 0
 
     env.close()

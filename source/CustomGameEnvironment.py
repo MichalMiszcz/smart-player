@@ -6,7 +6,6 @@ import numpy as np
 from gym import spaces
 import arcade
 import math
-import gymnasium
 
 from gym.core import ActType
 from gym.core import ObsType
@@ -25,6 +24,7 @@ class MyGame(arcade.Window):
 
         # self.set_update_rate(1/60)
 
+        self.end = False
         self.max_x = 0
         self.tile_map = None
         self.scene = None
@@ -70,19 +70,20 @@ class MyGame(arcade.Window):
         arcade.set_background_color(arcade.csscolor.CORNFLOWER_BLUE)
 
     def setup(self):
+        self.level = 1
         self.camera = arcade.Camera(self.width, self.height)
         self.gui_camera = arcade.Camera(self.width, self.height)
 
         self.previous_coin_distance = 10000
 
-        if self.level <= Consts.NUMBER_OF_LEVELS:
+        if self.level <= 1:
             map_name = f"levels/Level{self.level}.json"
         else:
             # game_won = UI.GameWonView()
             # self.window.show_view(game_won)
             print("You won")
-            arcade.exit()
-            return
+            self.end = True
+
 
         self.new_enemy = 0
 
@@ -486,7 +487,7 @@ class MyGame(arcade.Window):
     def get_observation(self):
         agent_pos = self.player_sprite.center_x
         target_pos = self.end_of_map
-        end = False
+
 
         coin_positions = self.get_something_positions(Consts.LAYER_NAME_COINS)
         spikes_positions = self.get_something_positions(Consts.LAYER_NAME_DONT_TOUCH)
@@ -496,7 +497,7 @@ class MyGame(arcade.Window):
         return {
             "agent": agent_pos,
             "target": target_pos,
-            "end": end,
+            "end": self.end,
             "coins": coin_observation,  # Include coin information in the observation
             "spikes": spikes_observation  # Include spikes information in the observation
         }
@@ -572,13 +573,16 @@ class MyGame(arcade.Window):
 
         # print(self.previous_coin_distance)
 
+        if self.end:
+            reward += 1000
+
         return reward
 
     def is_done(self):
         return False
 
 
-class CustomGameEnvironment(gymnasium.Env):
+class CustomGameEnvironment(gym.Env):
     def __init__(self):
         super(CustomGameEnvironment, self).__init__()
 
@@ -587,9 +591,17 @@ class CustomGameEnvironment(gymnasium.Env):
         self.game.setup()
 
         # Define observation and action spaces
-        self.observation_space = gymnasium.spaces.Box(low=0, high=255, shape=(self.game.get_height(),
-                                                                              self.game.get_width()), dtype=np.uint8)
-        self.action_space = gymnasium.spaces.discrete.Discrete(Consts.NUMBER_OF_ACTIONS)
+        self.observation_space = spaces.Dict(
+            {
+                "agent": spaces.Box(0, 6144, shape=(2,), dtype=float),
+                "target": spaces.Box(0, 6144, shape=(2,), dtype=float),
+                "end": spaces.Discrete(2),
+                "coins": spaces.Box(0, 1, shape=(1,), dtype=int),  # Include coin information in the observation
+                "spikes": spaces.Box(0, 1, shape=(1,), dtype=int)  # Include spikes information in the observation
+            }
+        )
+
+        self.action_space = gym.spaces.discrete.Discrete(Consts.NUMBER_OF_ACTIONS)
 
         # self.window = None
 
@@ -627,7 +639,10 @@ class CustomGameEnvironment(gymnasium.Env):
         self.iterations = 0
         self.game.setup()
         # self.window(self.game)
-        return self.game.get_info()
+        observation = self.game.get_observation()
+        info = self.game.get_info()  # Additional information, if needed
+
+        return observation, info
 
     def render(self, mode='human'):
         self.game.dispatch_events()
