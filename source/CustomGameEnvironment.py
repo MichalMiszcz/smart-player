@@ -232,23 +232,23 @@ class MyGame(arcade.Window):
         # action 3: jump
         # action 4: jump right
         # action 5: go right
-        if action == 1:
+        if action == 4:
             self.player_speed = -1
-        elif action == 2:
-            self.player_speed = -1
-            if self.physics_engine.can_jump():
-                self.player_sprite.change_y = Consts.PLAYER_JUMP_SPEED
-                # arcade.play_sound(self.jump_sound)
         elif action == 3:
+            self.player_speed = -1
             if self.physics_engine.can_jump():
                 self.player_sprite.change_y = Consts.PLAYER_JUMP_SPEED
                 # arcade.play_sound(self.jump_sound)
-        elif action == 4:
+        elif action == 2:
+            if self.physics_engine.can_jump():
+                self.player_sprite.change_y = Consts.PLAYER_JUMP_SPEED
+                # arcade.play_sound(self.jump_sound)
+        elif action == 1:
             self.player_speed = 1
             if self.physics_engine.can_jump():
                 self.player_sprite.change_y = Consts.PLAYER_JUMP_SPEED
                 # arcade.play_sound(self.jump_sound)
-        elif action == 5:
+        elif action == 0:
             self.player_speed = 1
 
     def center_camera_to_player(self):
@@ -325,10 +325,12 @@ class MyGame(arcade.Window):
         if self.physics_engine.can_jump():
             if self.player_speed > 0:
                 if self.player_sprite.change_x < Consts.PLAYER_MOVEMENT_SPEED_MAX:
-                    self.player_sprite.change_x += Consts.PLAYER_MOVEMENT_ACCELERATION * self.player_speed
+                    # self.player_sprite.change_x += Consts.PLAYER_MOVEMENT_ACCELERATION * self.player_speed
+                    self.player_sprite.change_x = Consts.PLAYER_MOVEMENT_SPEED_MAX * self.player_speed
             elif self.player_speed < 0:
                 if self.player_sprite.change_x > -Consts.PLAYER_MOVEMENT_SPEED_MAX:
-                    self.player_sprite.change_x += Consts.PLAYER_MOVEMENT_ACCELERATION * self.player_speed
+                    # self.player_sprite.change_x += Consts.PLAYER_MOVEMENT_ACCELERATION * self.player_speed
+                    self.player_sprite.change_x = Consts.PLAYER_MOVEMENT_SPEED_MAX * self.player_speed
             else:
                 self.player_sprite.change_x = 0
 
@@ -507,13 +509,15 @@ class MyGame(arcade.Window):
         nearest_coin_distance_x = min(abs(agent_pos[0] - coin_pos[0]) for coin_pos in coin_positions)
 
         nearest_coin_distance = float('inf')
+        nearest_coin = None
 
-        if not nearest_coin_distance_x < 30:
+        if nearest_coin_distance_x < (float(Consts.SPRITE_PIXEL_SIZE) * 2):
             nearest_coin = min((coin_pos for coin_pos in coin_positions), key=lambda x: abs(agent_pos[0] - x[0]))
             nearest_coin_distance = math.sqrt(pow((agent_pos[0] - nearest_coin[0]), 2) +
                                               pow((agent_pos[1] - nearest_coin[1]), 2))
 
-        return nearest_coin_distance
+        # cos nie tak
+        return nearest_coin_distance, nearest_coin
 
     def get_height(self):
         return self.tile_map.height * Consts.SPRITE_PIXEL_SIZE
@@ -524,29 +528,34 @@ class MyGame(arcade.Window):
     def get_observation(self):
         agent_pos_x = self.player_sprite.center_x
         agent_pos_y = self.player_sprite.center_y
-        agent_pos_x = np.array(agent_pos_x, dtype=np.float32)
+        agent_pos_x = np.array([agent_pos_x, agent_pos_y], dtype=np.float32)
         target_pos = self.end_of_map
-        target_pos = np.array(target_pos, dtype=np.float32)
+        target_pos = np.array([target_pos], dtype=np.float32)
 
         # print(type(self.time), self.time)
 
         # coin_positions = self.get_something_positions(Consts.LAYER_NAME_COINS)
         # spikes_positions = self.get_something_positions(Consts.LAYER_NAME_DONT_TOUCH)
 
-        nearest_spikes_distance = self.calculate_nearest_something_distance(Consts.LAYER_NAME_DONT_TOUCH)
-        nearest_spikes_distance = np.array(nearest_spikes_distance, dtype=np.float32)
+        nearest_spikes_distance, nearest_spikes = self.calculate_nearest_something_distance(Consts.LAYER_NAME_DONT_TOUCH)
+        nearest_spikes_distance = np.array([nearest_spikes_distance], dtype=np.float32)
+
+        if nearest_spikes is not None:
+            nearest_spikes = np.array([nearest_spikes[0], nearest_spikes[1]], dtype=np.float32)
+        else:
+            nearest_spikes = np.array([float('inf'), float('inf')], dtype=np.float32)
 
         # coin_observation = [1 if agent_pos in coin_positions else 0]
         # spikes_observation = [1 if agent_pos in spikes_positions else 0]
 
-        game_time = np.array(self.time, dtype=np.float32)
+        game_time = np.array([self.time], dtype=np.float32)
 
         return {
             "agent": agent_pos_x,
             "target": target_pos,
             "end": self.finished,
             "time": game_time,
-            "spike_distance": nearest_spikes_distance
+            "spike_distance": nearest_spikes
             # "coins": coin_observation,  # Include coin information in the observation
             # "spikes": spikes_observation  # Include spikes information in the observation
         }
@@ -562,7 +571,7 @@ class MyGame(arcade.Window):
 
         if self.died:
             # self.died = False
-            reward += -20
+            reward += -25
 
         # if self.score > self.old_score:
         #     self.old_score = self.score
@@ -573,23 +582,30 @@ class MyGame(arcade.Window):
             reward += -1
         elif self.max_x < self.player_sprite.center_x:
             self.max_x = self.player_sprite.center_x
-            reward += 3
-
-        if self.previous_position > self.player_sprite.center_x:
-            reward += -2
-        elif self.previous_position < self.player_sprite.center_x:
-            reward += 2
+            reward += 25
         else:
             reward += -1
+
+            if self.physics_engine.can_jump():
+                reward += -10
+
+        if self.previous_position > self.player_sprite.center_x:
+            # reward += -5
+            reward += 0
+        elif self.previous_position < self.player_sprite.center_x:
+            # reward += 5
+            reward += 0
+        else:
+            reward += -10
 
         self.previous_position = self.player_sprite.center_x
 
         if self.player_sprite.center_x >= self.end_of_map - 11:
-            reward += 1000/self.time
+            reward += 2500
             print(f"koniec_levelu, nagroda: {reward}")
 
             if self.time < self.min_time:
-                reward += 100
+                reward += 2500
                 self.min_time = self.time
 
         # # Calculate the distance to the nearest coin
@@ -614,22 +630,46 @@ class MyGame(arcade.Window):
         # self.previous_coin_distance = nearest_coin_distance
 
         # Calculate the distance to the nearest spike
-        nearest_spikes_distance = self.calculate_nearest_something_distance(Consts.LAYER_NAME_DONT_TOUCH)
+        nearest_spikes_distance, nearest_spikes = self.calculate_nearest_something_distance(Consts.LAYER_NAME_DONT_TOUCH)
 
         # Define reward components for moving towards/away from spikes
-        reward_near_spikes = -600  # Reward for getting closer to spikes
-        reward_away_spikes = 2  # Penalty for moving away from spikes
+        reward_near_spikes = -4000  # Reward for getting closer to spikes
+        reward_away_spikes = 100  # Penalty for moving away from spikes
 
         # Calculate the reward based on the change in distance to the nearest spike
-        # delta_distance = self.previous_spike_distance - nearest_spikes_distance
+        delta_distance = self.previous_spike_distance - nearest_spikes_distance
 
         # Determine if the agent is moving closer to or away from spikes
-        if 60 < abs(nearest_spikes_distance) < 90:
-            reward += reward_away_spikes
-        elif abs(nearest_spikes_distance) < 60:
-            reward += reward_near_spikes/nearest_spikes_distance
-        else:
-            reward += 0
+        if nearest_spikes is not None:
+
+            sprite_size = float(Consts.SPRITE_PIXEL_SIZE)
+            spikes_y = float(nearest_spikes[1])
+
+            # print(self.player_sprite.center_y, float(nearest_spikes[1]))
+            if abs(nearest_spikes_distance) < (sprite_size * 1.5):
+                if self.player_sprite.center_y >= (spikes_y + sprite_size * 0.5):
+                    reward += reward_near_spikes / (nearest_spikes_distance * 400)
+                else:
+                    reward += reward_away_spikes / 10
+            elif (sprite_size * 0.75) < abs(nearest_spikes_distance) < (sprite_size * 1.5):
+                if self.player_sprite.center_y >= (spikes_y + sprite_size * 0.5):
+                    reward += reward_away_spikes
+                else:
+                    reward += reward_near_spikes/nearest_spikes_distance
+            elif abs(nearest_spikes_distance) < (sprite_size * 0.75):
+                if self.player_sprite.center_y >= (spikes_y + sprite_size * 1.5):
+                    reward += reward_away_spikes
+                else:
+                    reward += reward_near_spikes/nearest_spikes_distance
+            else:
+                reward += 0
+
+        # if 40 < abs(nearest_spikes_distance) < 96:
+        #     reward += reward_away_spikes
+        # elif abs(nearest_spikes_distance) < 40:
+        #     reward += reward_near_spikes/nearest_spikes_distance
+        # else:
+        #     reward += 0
 
         # Update the previous coin distance for the next step
         self.previous_spike_distance = nearest_spikes_distance
@@ -637,9 +677,9 @@ class MyGame(arcade.Window):
         # print(self.previous_coin_distance)
 
         if self.end:
-            reward += 1000
+            reward += 100
 
-        return reward
+        return reward * Consts.REWARD_SCALE
 
     def done(self):
         return self.is_done
@@ -656,11 +696,11 @@ class CustomGameEnvironment(gym.Env):
         # Define observation and action spaces
         self.observation_space = spaces.Dict(
             {
-                "agent": spaces.Box(0, 6144, shape=(1,), dtype=np.float32),
+                "agent": spaces.Box(0, 6144, shape=(2,), dtype=np.float32),
                 "target": spaces.Box(0, 6144, shape=(1,), dtype=np.float32),
                 "end": spaces.Discrete(2),
                 "time": spaces.Box(0, 1000, shape=(1,), dtype=np.float32),
-                "spike_distance": spaces.Box(0, 6144, shape=(1,), dtype=np.float32)
+                "spike_distance": spaces.Box(0, 6144, shape=(2,), dtype=np.float32)
                 # "coins": spaces.Box(0, 1, shape=(1,), dtype=int),  # Include coin information in the observation
                 # "spikes": spaces.Box(0, 1, shape=(1,), dtype=int)  # Include spikes information in the observation
             }
