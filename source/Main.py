@@ -21,15 +21,15 @@ def main():
             model = DQN.load("models/CustomGame_v3", env, verbose=1)
         else:
             print("create model")
-            model = DQN("MultiInputPolicy", env, verbose=1, learning_rate=0.01, batch_size=256,
-                        gamma=0.99, exploration_initial_eps=1.0, exploration_final_eps=0.05, exploration_fraction=0.95)
-        model.learn(total_timesteps=1000000, log_interval=20, progress_bar=True)
-        model.save("models/CustomGame_v2")
+            model = DQN("MultiInputPolicy", env, verbose=1, learning_rate=0.0025, batch_size=256,
+                        gamma=0.99, exploration_initial_eps=1.0, exploration_final_eps=0.025, exploration_fraction=0.95)
+        model.learn(total_timesteps=2000000, log_interval=20, progress_bar=True)
+        model.save("models/CustomGame_level2")
 
         del model  # remove to demonstrate saving and loading
     else:
         print("show")
-        model = DQN.load("models/CustomGame_v2")
+        model = DQN.load("models/CustomGame_level2")
 
         obs, info = env.reset()
         while True:

@@ -1,5 +1,4 @@
 from collections import defaultdict
-# from typing import Tuple
 
 import gymnasium as gym
 import numpy as np
@@ -7,12 +6,8 @@ from gymnasium import spaces
 import arcade
 import math
 
-# from gym.core import ActType
-# from gym.core import ObsType
-
 import Player
 import Enemy
-# import UI
 import Consts
 
 
@@ -22,13 +17,9 @@ class MyGame(arcade.Window):
 
         super().__init__(width, height, title)
 
-        # self.set_update_rate(1/60)
-
         self.end = False
         self.time = 0.0
-        self.min_time = 1000000
         self.is_done = False
-        self.max_x = 0
         self.tile_map = None
         self.scene = None
         self.player_sprite = None
@@ -39,6 +30,14 @@ class MyGame(arcade.Window):
         self.bought = False
         self.health = 10
         self.died = False
+        self.finished = False
+
+        # Learning
+        self.max_x = 0
+        self.min_time = 1000000
+        self.previous_coin_distance = 10000.0
+        self.previous_spike_distance = 10000.0
+        self.previous_position = 128
 
         # Shooting mechanics
         self.can_shoot = False
@@ -56,22 +55,7 @@ class MyGame(arcade.Window):
         self.end_of_map1 = 0
         self.level = Consts.START_LEVEL
 
-        self.finished = False
-
-        # Sounds
-        self.collect_coin_sound = arcade.load_sound(":resources:sounds/coin1.wav")
-        self.jump_sound = arcade.load_sound(":resources:sounds/jump1.wav")
-        self.lose = arcade.load_sound(":resources:sounds/lose5.wav")
-        self.game_over = arcade.load_sound(":resources:sounds/gameover4.wav")
-        self.shoot_sound = arcade.load_sound(":resources:sounds/hurt5.wav")
-        self.hit_sound = arcade.load_sound(":resources:sounds/hit5.wav")
-        self.upgrade = arcade.load_sound(":resources:sounds/upgrade1.wav")
-
         self.new_enemy = 0
-
-        self.previous_coin_distance = 10000
-        self.previous_spike_distance = 10000
-        self.previous_position = 128
 
         arcade.set_background_color(arcade.csscolor.CORNFLOWER_BLUE)
 
@@ -84,22 +68,19 @@ class MyGame(arcade.Window):
         self.is_done = False
         self.died = False
         self.finished = False
+        self.old_score = 0
 
-        self.previous_coin_distance = 10000
+        self.previous_coin_distance = 10000.0
 
         if self.level <= Consts.START_LEVEL:
             map_name = f"levels/Level{self.level}.json"
         else:
             self.level = Consts.START_LEVEL
             map_name = f"levels/Level{self.level}.json"
-            # game_won = UI.GameWonView()
-            # self.window.show_view(game_won)
-            # print("You won")
-            # self.end = True
 
         self.new_enemy = 0
 
-        # Layer Specific Options for the Tilemap
+        # Layer Specific Options for the TileMap
         layer_options = {
             Consts.LAYER_NAME_PLATFORMS: {
                 "use_spatial_hash": True,
@@ -120,7 +101,7 @@ class MyGame(arcade.Window):
 
         if self.reset_score:
             self.score = 0
-        self.reset_score = True
+        # self.reset_score = True
 
         # Shooting mechanics
         self.can_shoot = True
@@ -131,11 +112,9 @@ class MyGame(arcade.Window):
         self.player_sprite.center_y = Consts.PLAYER_START_Y
         self.scene.add_sprite(Consts.LAYER_NAME_PLAYER, self.player_sprite)
 
-        # self.max_x = Consts.PLAYER_START_X
-
-        # variable for detecting if player ended the level
+        # Variable for detecting if player ended the level
         self.end_of_map = float((self.tile_map.width - 5) * Consts.GRID_PIXEL_SIZE)
-        # variable for detecting right edge of tilemap
+        # Variable for detecting right edge of map
         self.end_of_map1 = float((self.tile_map.width - 16) * Consts.GRID_PIXEL_SIZE)
 
         # Enemies
@@ -184,9 +163,6 @@ class MyGame(arcade.Window):
             self.health = 5
             return 0
 
-    # def on_show_view(self):
-    #     self.setup()
-
     def on_draw(self):
         arcade.start_render()
 
@@ -217,37 +193,34 @@ class MyGame(arcade.Window):
             18,
         )
 
-        bullet_text = f"Bullets: {self.bullets}"
+        time_text = f"Time: {self.time}"
         arcade.draw_text(
-            bullet_text,
-            870,
+            time_text,
+            820,
             10,
             arcade.csscolor.WHITE,
             18,
         )
 
     def take_action(self, action):
-        # action 1: go left
-        # action 2: jump left
-        # action 3: jump
-        # action 4: jump right
-        # action 5: go right
+        # action 4: go left
+        # action 3: jump left
+        # action 2: jump
+        # action 1: jump right
+        # action 0: go right
         if action == 4:
             self.player_speed = -1
         elif action == 3:
             self.player_speed = -1
             if self.physics_engine.can_jump():
                 self.player_sprite.change_y = Consts.PLAYER_JUMP_SPEED
-                # arcade.play_sound(self.jump_sound)
         elif action == 2:
             if self.physics_engine.can_jump():
                 self.player_sprite.change_y = Consts.PLAYER_JUMP_SPEED
-                # arcade.play_sound(self.jump_sound)
         elif action == 1:
             self.player_speed = 1
             if self.physics_engine.can_jump():
                 self.player_sprite.change_y = Consts.PLAYER_JUMP_SPEED
-                # arcade.play_sound(self.jump_sound)
         elif action == 0:
             self.player_speed = 1
 
@@ -273,23 +246,9 @@ class MyGame(arcade.Window):
         self.is_done = True
         print("dead")
 
-        # if self.death() == 1:
-        #     self.setup()
-        #     # self.player_sprite.change_x = 0
-        #     # self.player_sprite.change_y = 0
-        #     # self.player_sprite.center_x = Consts.PLAYER_START_X
-        #     # self.player_sprite.center_y = Consts.PLAYER_START_Y
-        #     # arcade.play_sound(self.lose)
-        # else:
-        #     self.level = 1
-        #     # game_over = UI.GameOverView()
-        #     # self.window.show_view(game_over)
-        #     # arcade.play_sound(self.game_over)
-
     def on_update(self, delta_time):
 
         self.time += 1/60
-        # print(self.time)
 
         # Enemies
         self.new_enemy += 1
@@ -339,7 +298,6 @@ class MyGame(arcade.Window):
 
         if self.can_shoot:
             if self.shoot_pressed:
-                # arcade.play_sound(self.shoot_sound)
                 bullet = arcade.Sprite("levels/Sprites/pocisk.png", 1)
 
                 if self.player_sprite.character_face_direction == Consts.RIGHT_FACING:
@@ -409,7 +367,6 @@ class MyGame(arcade.Window):
                             in collision.sprite_lists
                     ):
                         collision.death()
-                        # arcade.play_sound(self.hit_sound)
 
                 return
 
@@ -434,8 +391,6 @@ class MyGame(arcade.Window):
                 return
             else:
                 collision.remove_from_sprite_lists()
-                # Play a sound
-                # arcade.play_sound(self.collect_coin_sound)
                 self.score += 1
 
         if self.player_sprite.center_y < -100:
@@ -457,7 +412,6 @@ class MyGame(arcade.Window):
                         self.bullets += 1
                         self.score -= 2
                         self.bought = True
-                        # arcade.play_sound(self.upgrade)
 
         # See if the player got to the end of the level
         if self.player_sprite.center_x >= self.end_of_map:
@@ -466,13 +420,7 @@ class MyGame(arcade.Window):
 
             # Make sure to keep the score from this level when setting up the next level
             self.reset_score = False
-
             self.finished = True
-
-            # self.is_done = True
-            # print("finished")
-            #
-            # self.setup()
 
         self.center_camera_to_player()
 
@@ -531,12 +479,9 @@ class MyGame(arcade.Window):
         agent_pos_x = np.array([agent_pos_x, agent_pos_y], dtype=np.float32)
         target_pos = self.end_of_map
         target_pos = np.array([target_pos], dtype=np.float32)
+        game_time = np.array([self.time], dtype=np.float32)
 
-        # print(type(self.time), self.time)
-
-        # coin_positions = self.get_something_positions(Consts.LAYER_NAME_COINS)
-        # spikes_positions = self.get_something_positions(Consts.LAYER_NAME_DONT_TOUCH)
-
+        # Spikes
         nearest_spikes_distance, nearest_spikes = self.calculate_nearest_something_distance(Consts.LAYER_NAME_DONT_TOUCH)
         nearest_spikes_distance = np.array([nearest_spikes_distance], dtype=np.float32)
 
@@ -545,25 +490,25 @@ class MyGame(arcade.Window):
         else:
             nearest_spikes = np.array([float('inf'), float('inf')], dtype=np.float32)
 
-        # coin_observation = [1 if agent_pos in coin_positions else 0]
-        # spikes_observation = [1 if agent_pos in spikes_positions else 0]
+        # Coins
+        nearest_coin_distance, nearest_coin = self.calculate_nearest_something_distance(Consts.LAYER_NAME_COINS)
 
-        game_time = np.array([self.time], dtype=np.float32)
+        if nearest_coin is not None:
+            nearest_coin = np.array([nearest_coin[0], nearest_coin[1]], dtype=np.float32)
+        else:
+            nearest_coin = np.array([float('inf'), float('inf')], dtype=np.float32)
 
         return {
             "agent": agent_pos_x,
             "target": target_pos,
             "end": self.finished,
             "time": game_time,
-            "spike_distance": nearest_spikes
-            # "coins": coin_observation,  # Include coin information in the observation
-            # "spikes": spikes_observation  # Include spikes information in the observation
+            "spikes": nearest_spikes,
+            "coins": nearest_coin,
         }
 
     def get_info(self):
         return {"info": False}
-
-        # return {"distance": np.linalg.norm(self.player_sprite.center_x - self.end_of_map)}
 
     def get_reward(self):
 
@@ -573,11 +518,10 @@ class MyGame(arcade.Window):
             # self.died = False
             reward += -25
 
-        # if self.score > self.old_score:
-        #     self.old_score = self.score
-        #     reward += 200
+        if self.score > self.old_score:
+            self.old_score = self.score
+            reward += 250
 
-        # print(self.player_sprite.center_x)
         if self.max_x > self.player_sprite.center_x:
             reward += -1
         elif self.max_x < self.player_sprite.center_x:
@@ -608,26 +552,26 @@ class MyGame(arcade.Window):
                 reward += 2500
                 self.min_time = self.time
 
-        # # Calculate the distance to the nearest coin
-        # nearest_coin_distance = self.calculate_nearest_something_distance(Consts.LAYER_NAME_COINS)
-        #
-        # # Define reward components for moving towards/away from coins
-        # reward_near_coin = 30  # Reward for getting closer to coins
-        # reward_away_coin = -10  # Penalty for moving away from coins
-        #
-        # # Calculate the reward based on the change in distance to the nearest coin
-        # delta_distance = self.previous_coin_distance - nearest_coin_distance
-        #
-        # # Determine if the agent is moving closer to or away from coins
-        # if delta_distance > 0:
-        #     reward += reward_near_coin
-        # elif delta_distance == 0:
-        #     reward += -20
-        # else:
-        #     reward += reward_away_coin
-        #
-        # # Update the previous coin distance for the next step
-        # self.previous_coin_distance = nearest_coin_distance
+        # Calculate the distance to the nearest coin
+        nearest_coin_distance, _ = self.calculate_nearest_something_distance(Consts.LAYER_NAME_COINS)
+
+        # Define reward components for moving towards/away from coins
+        reward_near_coin = 15  # Reward for getting closer to coins
+        reward_away_coin = -1  # Penalty for moving away from coins
+
+        # Calculate the reward based on the change in distance to the nearest coin
+        delta_distance = self.previous_coin_distance - nearest_coin_distance
+
+        # Determine if the agent is moving closer to or away from coins
+        if delta_distance > 0:
+            reward += reward_near_coin
+        elif delta_distance == 0:
+            reward += -1
+        else:
+            reward += reward_away_coin
+
+        # Update the previous coin distance for the next step
+        self.previous_coin_distance = nearest_coin_distance
 
         # Calculate the distance to the nearest spike
         nearest_spikes_distance, nearest_spikes = self.calculate_nearest_something_distance(Consts.LAYER_NAME_DONT_TOUCH)
@@ -635,9 +579,6 @@ class MyGame(arcade.Window):
         # Define reward components for moving towards/away from spikes
         reward_near_spikes = -4000  # Reward for getting closer to spikes
         reward_away_spikes = 100  # Penalty for moving away from spikes
-
-        # Calculate the reward based on the change in distance to the nearest spike
-        delta_distance = self.previous_spike_distance - nearest_spikes_distance
 
         # Determine if the agent is moving closer to or away from spikes
         if nearest_spikes is not None:
@@ -674,8 +615,6 @@ class MyGame(arcade.Window):
         # Update the previous coin distance for the next step
         self.previous_spike_distance = nearest_spikes_distance
 
-        # print(self.previous_coin_distance)
-
         if self.end:
             reward += 100
 
@@ -700,9 +639,8 @@ class CustomGameEnvironment(gym.Env):
                 "target": spaces.Box(0, 6144, shape=(1,), dtype=np.float32),
                 "end": spaces.Discrete(2),
                 "time": spaces.Box(0, 1000, shape=(1,), dtype=np.float32),
-                "spike_distance": spaces.Box(0, 6144, shape=(2,), dtype=np.float32)
-                # "coins": spaces.Box(0, 1, shape=(1,), dtype=int),  # Include coin information in the observation
-                # "spikes": spaces.Box(0, 1, shape=(1,), dtype=int)  # Include spikes information in the observation
+                "spikes": spaces.Box(0, 6144, shape=(2,), dtype=np.float32),
+                "coins": spaces.Box(0, 6144, shape=(2,), dtype=np.float32),
             }
         )
 
