@@ -425,26 +425,26 @@ class MyGame(arcade.Window):
         self.center_camera_to_player()
 
     def get_something_positions(self, layer):
-        coin_positions = []
-        coin_layer = self.scene[layer]
+        something_positions = []
+        something_layer = self.scene[layer]
 
-        for coin_object in coin_layer:
+        for coin_object in something_layer:
             # Calculate the position of each coin and add it to the list
             cartesian = self.tile_map.get_cartesian(
                 coin_object.center_x, coin_object.center_y
             )
 
-            coin_position_x = math.floor(
+            something_position_x = math.floor(
                 cartesian[0] * Consts.TILE_SCALING * self.tile_map.tile_width
             )
-            coin_position_y = math.floor(
+            something_position_y = math.floor(
                 cartesian[1] * Consts.TILE_SCALING * self.tile_map.tile_width
             )
 
-            cartesian = (coin_position_x, coin_position_y)
-            coin_positions.append(cartesian)
+            cartesian = (something_position_x, something_position_y)
+            something_positions.append(cartesian)
 
-        return coin_positions
+        return something_positions
 
     def calculate_nearest_something_distance(self, layer):
         agent_pos = (self.player_sprite.center_x, self.player_sprite.center_y)
@@ -476,7 +476,7 @@ class MyGame(arcade.Window):
     def get_observation(self):
         agent_pos_x = self.player_sprite.center_x
         agent_pos_y = self.player_sprite.center_y
-        agent_pos_x = np.array([agent_pos_x, agent_pos_y], dtype=np.float32)
+        agent_pos = np.array([agent_pos_x, agent_pos_y], dtype=np.float32)
         target_pos = self.end_of_map
         target_pos = np.array([target_pos], dtype=np.float32)
         game_time = np.array([self.time], dtype=np.float32)
@@ -499,7 +499,7 @@ class MyGame(arcade.Window):
             nearest_coin = np.array([float('inf'), float('inf')], dtype=np.float32)
 
         return {
-            "agent": agent_pos_x,
+            "agent": agent_pos,
             "target": target_pos,
             "end": self.finished,
             "time": game_time,
@@ -529,7 +529,6 @@ class MyGame(arcade.Window):
             reward += 25
         else:
             reward += -1
-
             if self.physics_engine.can_jump():
                 reward += -10
 
@@ -649,15 +648,9 @@ class CustomGameEnvironment(gym.Env):
         # self.window = None
 
         # self.epsilon = 0.1
-        self.q_values = defaultdict(lambda: np.zeros(5))
+        # self.q_values = defaultdict(lambda: np.zeros(5))
         self.max_iterations = Consts.MAX_ITERATIONS
         self.iterations = 0
-
-    # def set_epsilon(self, epsilon):
-    #     self.epsilon = epsilon
-
-    # def set_window(self, window):
-    #     self.window = window
 
     def step(self, action):
         # Take action in the game
@@ -696,8 +689,6 @@ class CustomGameEnvironment(gym.Env):
         observation = self.game.get_observation()
         info = self.game.get_info()  # Additional information, if needed
 
-        # print(observation)
-
         return observation, info
 
     def render(self, mode='human'):
@@ -712,9 +703,3 @@ class CustomGameEnvironment(gym.Env):
     def close(self):
         # Close any resources when done
         self.game.setup()
-
-    # def get_action(self, do):
-    #     if np.random.random() < self.epsilon:
-    #         return np.random.randint(1, 6)
-    #     else:
-    #         return do
