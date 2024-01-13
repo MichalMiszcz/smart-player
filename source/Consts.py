@@ -3,9 +3,11 @@ NUM_EPISODES = 200
 LEARN = False
 LOAD = False
 NUM_EPISODES_TEST = 20
-START_LEVEL = 1
+START_LEVEL = 2
 REWARD_SCALE = 0.1
 NUMBER_OF_ACTIONS = 5
+FILE_TO_SAVE = "models/CustomGame_level2v3"
+FILE_TO_LOAD = "models/CustomGame_level2v3"
 
 # Reset of environment
 MAX_ITERATIONS = 2500
