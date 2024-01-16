@@ -14,6 +14,30 @@ model.learn(total_timesteps=2000000, log_interval=20, progress_bar=True)
 
 ________________________________________________________________________________________________________________________
 
+CustomGame_level1v4
+
+model = DQN("MultiInputPolicy", env, verbose=1, learning_rate=0.004, batch_size=256,
+                        gamma=0.25, exploration_initial_eps=1.0, exploration_final_eps=0.01, exploration_fraction=0.99)
+model.learn(total_timesteps=10000000, log_interval=20, progress_bar=True, callback=reward_logger)
+
+________________________________________________________________________________________________________________________
+
+CustomGame_level1v5
+
+model = DQN("MultiInputPolicy", env, verbose=1, learning_rate=0.0001, batch_size=256,
+                        gamma=0.99, exploration_initial_eps=1.0, exploration_final_eps=0.01, exploration_fraction=0.99)
+model.learn(total_timesteps=5000000, log_interval=20, progress_bar=True, callback=reward_logger)
+
+________________________________________________________________________________________________________________________
+
+CustomGame_level1v6
+
+model = DQN("MultiInputPolicy", env, verbose=1, learning_rate=0.1, batch_size=256,
+                        gamma=0.25, exploration_initial_eps=1.0, exploration_final_eps=0.01, exploration_fraction=0.99)
+        model.learn(total_timesteps=10000000, log_interval=20, progress_bar=True, callback=reward_logger)
+
+________________________________________________________________________________________________________________________
+
 CustomGame_level2v1
 
 model = DQN("MultiInputPolicy", env, verbose=1, learning_rate=0.01, batch_size=256,
@@ -35,3 +59,11 @@ CustomGame_level2v3
 model = DQN("MultiInputPolicy", env=env, verbose=1, learning_rate=0.1, batch_size=512,
                         gamma=0.25, exploration_initial_eps=1.0, exploration_final_eps=0.1, exploration_fraction=0.99)
 model.learn(total_timesteps=2000000, log_interval=20, progress_bar=True)
+
+________________________________________________________________________________________________________________________
+
+CustomGame_level2v4
+
+model = DQN("MultiInputPolicy", env, verbose=1, learning_rate=0.1, batch_size=512,
+                        gamma=0.99, exploration_initial_eps=1.0, exploration_final_eps=0.01, exploration_fraction=0.98)
+model.learn(total_timesteps=6000000, log_interval=20, progress_bar=True, callback=reward_logger)

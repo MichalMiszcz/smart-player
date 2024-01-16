@@ -1,13 +1,13 @@
 # Learning variables
 NUM_EPISODES = 200
-LEARN = False
+LEARN = True
 LOAD = False
 NUM_EPISODES_TEST = 20
-START_LEVEL = 2
+START_LEVEL = 1
 REWARD_SCALE = 0.1
 NUMBER_OF_ACTIONS = 5
-FILE_TO_SAVE = "models/CustomGame_level2v3"
-FILE_TO_LOAD = "models/CustomGame_level2v3"
+FILE_TO_SAVE = "models/CustomGame_level1vPlotTest"
+FILE_TO_LOAD = "models/CustomGame_level1vPlotTest"
 
 # Reset of environment
 MAX_ITERATIONS = 2500

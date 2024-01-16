@@ -1,9 +1,11 @@
 import gymnasium as gym
 from stable_baselines3 import DQN
+from stable_baselines3.common.callbacks import BaseCallback
+
 import csv
+import matplotlib.pyplot as plt
 
 import Consts
-
 import CustomGameEnvironment
 
 gym.envs.register(
@@ -14,18 +16,39 @@ gym.envs.register(
 env = gym.make('CustomGame-v0')
 
 
+class RewardLoggerCallback(BaseCallback):
+    def __init__(self, verbose=0):
+        super(RewardLoggerCallback, self).__init__(verbose)
+        self.cumulative_rewards = []
+
+    def _on_step(self) -> bool:
+        # print(self.locals['rewards'][0])
+
+        if 'rewards' in self.locals:
+            self.cumulative_rewards.append(self.locals['rewards'][0])
+        return True
+
+
 def main():
 
     if Consts.LEARN:
+        reward_logger = RewardLoggerCallback()
+
         if Consts.LOAD:
             print("load")
             model = DQN.load(path=Consts.FILE_TO_LOAD, env=env, verbose=1)
         else:
             print("create model")
-            model = DQN("MultiInputPolicy", env=env, verbose=1, learning_rate=0.1, batch_size=512,
-                        gamma=0.25, exploration_initial_eps=1.0, exploration_final_eps=0.1, exploration_fraction=0.99)
-        model.learn(total_timesteps=2000000, log_interval=20, progress_bar=True)
+            model = DQN("MultiInputPolicy", env, verbose=1, learning_rate=0.1, batch_size=256,
+                        gamma=0.25, exploration_initial_eps=1.0, exploration_final_eps=0.01, exploration_fraction=0.99)
+        model.learn(total_timesteps=10000, log_interval=20, progress_bar=True, callback=reward_logger)
         model.save(path=Consts.FILE_TO_SAVE)
+
+        plt.plot(reward_logger.cumulative_rewards)
+        plt.xlabel('Steps')
+        plt.ylabel('Cumulative Reward')
+        plt.title('Cumulative Reward Over Time')
+        plt.show()
 
         del model  # remove to demonstrate saving and loading
     else:
