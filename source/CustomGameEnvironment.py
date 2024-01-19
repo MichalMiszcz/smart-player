@@ -31,6 +31,7 @@ class MyGame(arcade.Window):
         self.health = 10
         self.died = False
         self.finished = False
+        self.finished_level = False
 
         # Learning
         self.max_x = 0
@@ -68,6 +69,7 @@ class MyGame(arcade.Window):
         self.is_done = False
         self.died = False
         self.finished = False
+        self.finished_level = False
         self.old_score = 0
 
         self.previous_coin_distance = 10000.0
@@ -248,7 +250,7 @@ class MyGame(arcade.Window):
 
     def on_update(self, delta_time):
 
-        self.time += 1/60
+        self.time += 1 / 60
 
         # Enemies
         self.new_enemy += 1
@@ -482,7 +484,8 @@ class MyGame(arcade.Window):
         game_time = np.array([self.time], dtype=np.float32)
 
         # Spikes
-        nearest_spikes_distance, nearest_spikes = self.calculate_nearest_something_distance(Consts.LAYER_NAME_DONT_TOUCH)
+        nearest_spikes_distance, nearest_spikes = self.calculate_nearest_something_distance(
+            Consts.LAYER_NAME_DONT_TOUCH)
         nearest_spikes_distance = np.array([nearest_spikes_distance], dtype=np.float32)
 
         if nearest_spikes is not None:
@@ -543,7 +546,7 @@ class MyGame(arcade.Window):
 
         self.previous_position = self.player_sprite.center_x
 
-        if self.player_sprite.center_x >= self.end_of_map - 11:
+        if self.player_sprite.center_x >= self.end_of_map - 11 and self.finished_level == False:
             reward += 2500
             print(f"koniec_levelu, nagroda: {reward}")
 
@@ -551,11 +554,13 @@ class MyGame(arcade.Window):
                 reward += 2500
                 self.min_time = self.time
 
+            self.finished_level = True  # Gains reward once per try
+
         # Calculate the distance to the nearest coin
         nearest_coin_distance, _ = self.calculate_nearest_something_distance(Consts.LAYER_NAME_COINS)
 
         # Define reward components for moving towards/away from coins
-        reward_near_coin = 15  # Reward for getting closer to coins
+        reward_near_coin = 5  # 15 Reward for getting closer to coins
         reward_away_coin = -1  # Penalty for moving away from coins
 
         # Calculate the reward based on the change in distance to the nearest coin
@@ -573,11 +578,12 @@ class MyGame(arcade.Window):
         self.previous_coin_distance = nearest_coin_distance
 
         # Calculate the distance to the nearest spike
-        nearest_spikes_distance, nearest_spikes = self.calculate_nearest_something_distance(Consts.LAYER_NAME_DONT_TOUCH)
+        nearest_spikes_distance, nearest_spikes = self.calculate_nearest_something_distance(
+            Consts.LAYER_NAME_DONT_TOUCH)
 
         # Define reward components for moving towards/away from spikes
-        reward_near_spikes = -4000  # Reward for getting closer to spikes
-        reward_away_spikes = 100  # Penalty for moving away from spikes
+        reward_near_spikes = -4000  # Penalty for getting closer to spikes
+        reward_away_spikes = 0  # 100 Reward for moving away from spikes
 
         # Determine if the agent is moving closer to or away from spikes
         if nearest_spikes is not None:
@@ -595,12 +601,12 @@ class MyGame(arcade.Window):
                 if self.player_sprite.center_y >= (spikes_y + sprite_size * 0.5):
                     reward += reward_away_spikes
                 else:
-                    reward += reward_near_spikes/nearest_spikes_distance
+                    reward += reward_near_spikes / nearest_spikes_distance
             elif abs(nearest_spikes_distance) < (sprite_size * 0.75):
                 if self.player_sprite.center_y >= (spikes_y + sprite_size * 1.5):
                     reward += reward_away_spikes
                 else:
-                    reward += reward_near_spikes/nearest_spikes_distance
+                    reward += reward_near_spikes / nearest_spikes_distance
             else:
                 reward += 0
 
@@ -667,17 +673,27 @@ class CustomGameEnvironment(gym.Env):
 
         # print(observation, " ", reward)
 
+        message = ""
+
         if self.iterations > self.max_iterations:
-            print("reset")
+            if not Consts.LEARN:
+                message = "reset"
+                print("reset")
             self.game.is_done = True
 
         if self.game.died:
-            print("dead")
+            if not Consts.LEARN:
+                message = "dead"
+                print("dead")
             self.game.is_done = True
 
         if self.game.finished:
-            print("finished")
+            if not Consts.LEARN:
+                message = "finished"
+                print("finished")
             self.game.is_done = True
+
+        info = {"message": message}
 
         return observation, reward, done, False, info
 

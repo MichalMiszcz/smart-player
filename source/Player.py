@@ -57,7 +57,7 @@ class PlayerCharacter(arcade.Sprite):
         if self.change_x < 0 and self.character_face_direction == Consts.RIGHT_FACING:
             self.character_face_direction = Consts.LEFT_FACING
         elif self.change_x > 0 and self.character_face_direction == Consts.LEFT_FACING:
-            self.character_face_direction = Consts. RIGHT_FACING
+            self.character_face_direction = Consts.RIGHT_FACING
 
         # Jumping animation
         if self.change_y > 0:

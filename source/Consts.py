@@ -6,8 +6,8 @@ NUM_EPISODES_TEST = 20
 START_LEVEL = 1
 REWARD_SCALE = 0.1
 NUMBER_OF_ACTIONS = 5
-FILE_TO_SAVE = "models/CustomGame_level1vPlotTest"
-FILE_TO_LOAD = "models/CustomGame_level1vPlotTest"
+FILE_TO_SAVE = "models/CustomGame_level1v8"
+FILE_TO_LOAD = "models/CustomGame_level1v7(best)"
 
 # Reset of environment
 MAX_ITERATIONS = 2500
