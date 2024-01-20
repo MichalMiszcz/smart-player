@@ -1,5 +1,4 @@
 # Learning variables
-NUM_EPISODES = 200
 LEARN = True
 LOAD = False
 NUM_EPISODES_TEST = 20

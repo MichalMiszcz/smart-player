@@ -518,7 +518,6 @@ class MyGame(arcade.Window):
         reward = 0
 
         if self.died:
-            # self.died = False
             reward += -25
 
         if self.score > self.old_score:
@@ -536,10 +535,8 @@ class MyGame(arcade.Window):
                 reward += -10
 
         if self.previous_position > self.player_sprite.center_x:
-            # reward += -5
             reward += 0
         elif self.previous_position < self.player_sprite.center_x:
-            # reward += 5
             reward += 0
         else:
             reward += -10
@@ -560,7 +557,7 @@ class MyGame(arcade.Window):
         nearest_coin_distance, _ = self.calculate_nearest_something_distance(Consts.LAYER_NAME_COINS)
 
         # Define reward components for moving towards/away from coins
-        reward_near_coin = 5  # 15 Reward for getting closer to coins
+        reward_near_coin = 15  # Reward for getting closer to coins
         reward_away_coin = -1  # Penalty for moving away from coins
 
         # Calculate the reward based on the change in distance to the nearest coin
@@ -583,7 +580,7 @@ class MyGame(arcade.Window):
 
         # Define reward components for moving towards/away from spikes
         reward_near_spikes = -4000  # Penalty for getting closer to spikes
-        reward_away_spikes = 0  # 100 Reward for moving away from spikes
+        reward_away_spikes = 100  # Reward for moving away from spikes
 
         # Determine if the agent is moving closer to or away from spikes
         if nearest_spikes is not None:
@@ -609,13 +606,6 @@ class MyGame(arcade.Window):
                     reward += reward_near_spikes / nearest_spikes_distance
             else:
                 reward += 0
-
-        # if 40 < abs(nearest_spikes_distance) < 96:
-        #     reward += reward_away_spikes
-        # elif abs(nearest_spikes_distance) < 40:
-        #     reward += reward_near_spikes/nearest_spikes_distance
-        # else:
-        #     reward += 0
 
         # Update the previous coin distance for the next step
         self.previous_spike_distance = nearest_spikes_distance
