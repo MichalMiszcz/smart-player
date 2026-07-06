@@ -1,19 +1,13 @@
 from collections import defaultdict
-from typing import Tuple
 
-import gym
+import gymnasium as gym
 import numpy as np
-from gym import spaces
+from gymnasium import spaces
 import arcade
 import math
-import gymnasium
-
-from gym.core import ActType
-from gym.core import ObsType
 
 import Player
 import Enemy
-import UI
 import Consts
 
 
@@ -23,9 +17,9 @@ class MyGame(arcade.Window):
 
         super().__init__(width, height, title)
 
-        # self.set_update_rate(1/60)
-
-        self.max_x = 0
+        self.end = False
+        self.time = 0.0
+        self.is_done = False
         self.tile_map = None
         self.scene = None
         self.player_sprite = None
@@ -36,6 +30,15 @@ class MyGame(arcade.Window):
         self.bought = False
         self.health = 10
         self.died = False
+        self.finished = False
+        self.finished_level = False
+
+        # Learning
+        self.max_x = 0
+        self.min_time = 1000000
+        self.previous_coin_distance = 10000.0
+        self.previous_spike_distance = 10000.0
+        self.previous_position = 128
 
         # Shooting mechanics
         self.can_shoot = False
@@ -51,42 +54,35 @@ class MyGame(arcade.Window):
         self.reset_score = True
         self.end_of_map = 0
         self.end_of_map1 = 0
-        self.level = 1
-
-        # Sounds
-        self.collect_coin_sound = arcade.load_sound(":resources:sounds/coin1.wav")
-        self.jump_sound = arcade.load_sound(":resources:sounds/jump1.wav")
-        self.lose = arcade.load_sound(":resources:sounds/lose5.wav")
-        self.game_over = arcade.load_sound(":resources:sounds/gameover4.wav")
-        self.shoot_sound = arcade.load_sound(":resources:sounds/hurt5.wav")
-        self.hit_sound = arcade.load_sound(":resources:sounds/hit5.wav")
-        self.upgrade = arcade.load_sound(":resources:sounds/upgrade1.wav")
+        self.level = Consts.START_LEVEL
 
         self.new_enemy = 0
-
-        self.previous_coin_distance = 10000
-        self.previous_spike_distance = 10000
 
         arcade.set_background_color(arcade.csscolor.CORNFLOWER_BLUE)
 
     def setup(self):
+        self.time = 0.0
+        self.level = Consts.START_LEVEL
         self.camera = arcade.Camera(self.width, self.height)
         self.gui_camera = arcade.Camera(self.width, self.height)
 
-        self.previous_coin_distance = 10000
+        self.is_done = False
+        self.died = False
+        self.finished = False
+        self.finished_level = False
+        self.old_score = 0
 
-        if self.level <= Consts.NUMBER_OF_LEVELS:
+        self.previous_coin_distance = 10000.0
+
+        if self.level <= Consts.START_LEVEL:
             map_name = f"levels/Level{self.level}.json"
         else:
-            # game_won = UI.GameWonView()
-            # self.window.show_view(game_won)
-            print("You won")
-            arcade.exit()
-            return
+            self.level = Consts.START_LEVEL
+            map_name = f"levels/Level{self.level}.json"
 
         self.new_enemy = 0
 
-        # Layer Specific Options for the Tilemap
+        # Layer Specific Options for the TileMap
         layer_options = {
             Consts.LAYER_NAME_PLATFORMS: {
                 "use_spatial_hash": True,
@@ -107,7 +103,7 @@ class MyGame(arcade.Window):
 
         if self.reset_score:
             self.score = 0
-        self.reset_score = True
+        # self.reset_score = True
 
         # Shooting mechanics
         self.can_shoot = True
@@ -118,12 +114,10 @@ class MyGame(arcade.Window):
         self.player_sprite.center_y = Consts.PLAYER_START_Y
         self.scene.add_sprite(Consts.LAYER_NAME_PLAYER, self.player_sprite)
 
-        self.max_x = Consts.PLAYER_START_X
-
-        # variable for detecting if player ended the level
-        self.end_of_map = (self.tile_map.width - 5) * Consts.GRID_PIXEL_SIZE
-        # variable for detecting right edge of tilemap
-        self.end_of_map1 = (self.tile_map.width - 16) * Consts.GRID_PIXEL_SIZE
+        # Variable for detecting if player ended the level
+        self.end_of_map = float((self.tile_map.width - 5) * Consts.GRID_PIXEL_SIZE)
+        # Variable for detecting right edge of map
+        self.end_of_map1 = float((self.tile_map.width - 16) * Consts.GRID_PIXEL_SIZE)
 
         # Enemies
         enemies_layer = self.tile_map.object_lists[Consts.LAYER_NAME_ENEMIES]
@@ -171,9 +165,6 @@ class MyGame(arcade.Window):
             self.health = 5
             return 0
 
-    # def on_show_view(self):
-    #     self.setup()
-
     def on_draw(self):
         arcade.start_render()
 
@@ -204,38 +195,35 @@ class MyGame(arcade.Window):
             18,
         )
 
-        bullet_text = f"Bullets: {self.bullets}"
+        time_text = f"Time: {self.time}"
         arcade.draw_text(
-            bullet_text,
-            870,
+            time_text,
+            820,
             10,
             arcade.csscolor.WHITE,
             18,
         )
 
     def take_action(self, action):
-        # action 1: go left
-        # action 2: jump left
-        # action 3: jump
-        # action 4: jump right
-        # action 5: go right
-        if action == 1:
+        # action 4: go left
+        # action 3: jump left
+        # action 2: jump
+        # action 1: jump right
+        # action 0: go right
+        if action == 4:
             self.player_speed = -1
-        elif action == 2:
-            self.player_speed = -1
-            if self.physics_engine.can_jump():
-                self.player_sprite.change_y = Consts.PLAYER_JUMP_SPEED
-                # arcade.play_sound(self.jump_sound)
         elif action == 3:
+            self.player_speed = -1
             if self.physics_engine.can_jump():
                 self.player_sprite.change_y = Consts.PLAYER_JUMP_SPEED
-                # arcade.play_sound(self.jump_sound)
-        elif action == 4:
+        elif action == 2:
+            if self.physics_engine.can_jump():
+                self.player_sprite.change_y = Consts.PLAYER_JUMP_SPEED
+        elif action == 1:
             self.player_speed = 1
             if self.physics_engine.can_jump():
                 self.player_sprite.change_y = Consts.PLAYER_JUMP_SPEED
-                # arcade.play_sound(self.jump_sound)
-        elif action == 5:
+        elif action == 0:
             self.player_speed = 1
 
     def center_camera_to_player(self):
@@ -257,20 +245,12 @@ class MyGame(arcade.Window):
     def players_death(self):
         self.died = True
 
-        if self.death() == 1:
-            self.setup()
-            # self.player_sprite.change_x = 0
-            # self.player_sprite.change_y = 0
-            # self.player_sprite.center_x = Consts.PLAYER_START_X
-            # self.player_sprite.center_y = Consts.PLAYER_START_Y
-            # arcade.play_sound(self.lose)
-        else:
-            self.level = 1
-            # game_over = UI.GameOverView()
-            # self.window.show_view(game_over)
-            # arcade.play_sound(self.game_over)
+        self.is_done = True
+        print("dead")
 
     def on_update(self, delta_time):
+
+        self.time += 1 / 60
 
         # Enemies
         self.new_enemy += 1
@@ -306,10 +286,12 @@ class MyGame(arcade.Window):
         if self.physics_engine.can_jump():
             if self.player_speed > 0:
                 if self.player_sprite.change_x < Consts.PLAYER_MOVEMENT_SPEED_MAX:
-                    self.player_sprite.change_x += Consts.PLAYER_MOVEMENT_ACCELERATION * self.player_speed
+                    # self.player_sprite.change_x += Consts.PLAYER_MOVEMENT_ACCELERATION * self.player_speed
+                    self.player_sprite.change_x = Consts.PLAYER_MOVEMENT_SPEED_MAX * self.player_speed
             elif self.player_speed < 0:
                 if self.player_sprite.change_x > -Consts.PLAYER_MOVEMENT_SPEED_MAX:
-                    self.player_sprite.change_x += Consts.PLAYER_MOVEMENT_ACCELERATION * self.player_speed
+                    # self.player_sprite.change_x += Consts.PLAYER_MOVEMENT_ACCELERATION * self.player_speed
+                    self.player_sprite.change_x = Consts.PLAYER_MOVEMENT_SPEED_MAX * self.player_speed
             else:
                 self.player_sprite.change_x = 0
 
@@ -318,7 +300,6 @@ class MyGame(arcade.Window):
 
         if self.can_shoot:
             if self.shoot_pressed:
-                # arcade.play_sound(self.shoot_sound)
                 bullet = arcade.Sprite("levels/Sprites/pocisk.png", 1)
 
                 if self.player_sprite.character_face_direction == Consts.RIGHT_FACING:
@@ -388,7 +369,6 @@ class MyGame(arcade.Window):
                             in collision.sprite_lists
                     ):
                         collision.death()
-                        # arcade.play_sound(self.hit_sound)
 
                 return
 
@@ -413,8 +393,6 @@ class MyGame(arcade.Window):
                 return
             else:
                 collision.remove_from_sprite_lists()
-                # Play a sound
-                # arcade.play_sound(self.collect_coin_sound)
                 self.score += 1
 
         if self.player_sprite.center_y < -100:
@@ -436,46 +414,60 @@ class MyGame(arcade.Window):
                         self.bullets += 1
                         self.score -= 2
                         self.bought = True
-                        # arcade.play_sound(self.upgrade)
 
         # See if the player got to the end of the level
         if self.player_sprite.center_x >= self.end_of_map:
-            self.level += 1
+            # self.level += 1
+            self.max_x = Consts.PLAYER_START_X
 
             # Make sure to keep the score from this level when setting up the next level
             self.reset_score = False
-
-            self.setup()
+            self.finished = True
 
         self.center_camera_to_player()
 
     def get_something_positions(self, layer):
-        coin_positions = []
-        coin_layer = self.scene[layer]
+        something_positions = []
+        something_layer = self.scene[layer]
 
-        for coin_object in coin_layer:
+        for coin_object in something_layer:
             # Calculate the position of each coin and add it to the list
             cartesian = self.tile_map.get_cartesian(
                 coin_object.center_x, coin_object.center_y
             )
-            coin_position = math.floor(
+
+            something_position_x = math.floor(
                 cartesian[0] * Consts.TILE_SCALING * self.tile_map.tile_width
             )
-            coin_positions.append(coin_position)
+            something_position_y = math.floor(
+                cartesian[1] * Consts.TILE_SCALING * self.tile_map.tile_width
+            )
 
-        return coin_positions
+            cartesian = (something_position_x, something_position_y)
+            something_positions.append(cartesian)
+
+        return something_positions
 
     def calculate_nearest_something_distance(self, layer):
-        agent_pos = self.player_sprite.center_x
+        agent_pos = (self.player_sprite.center_x, self.player_sprite.center_y)
         coin_positions = self.get_something_positions(layer)
 
         if not coin_positions:
             return float('inf')  # No coins present
 
         # Calculate the distance to the nearest coin
-        nearest_coin_distance = min(abs(agent_pos - coin_pos) for coin_pos in coin_positions)
+        nearest_coin_distance_x = min(abs(agent_pos[0] - coin_pos[0]) for coin_pos in coin_positions)
 
-        return nearest_coin_distance
+        nearest_coin_distance = float('inf')
+        nearest_coin = None
+
+        if nearest_coin_distance_x < (float(Consts.SPRITE_PIXEL_SIZE) * 2):
+            nearest_coin = min((coin_pos for coin_pos in coin_positions), key=lambda x: abs(agent_pos[0] - x[0]))
+            nearest_coin_distance = math.sqrt(pow((agent_pos[0] - nearest_coin[0]), 2) +
+                                              pow((agent_pos[1] - nearest_coin[1]), 2))
+
+        # cos nie tak
+        return nearest_coin_distance, nearest_coin
 
     def get_height(self):
         return self.tile_map.height * Consts.SPRITE_PIXEL_SIZE
@@ -484,56 +476,89 @@ class MyGame(arcade.Window):
         return self.tile_map.height * Consts.SPRITE_PIXEL_SIZE
 
     def get_observation(self):
-        agent_pos = self.player_sprite.center_x
+        agent_pos_x = self.player_sprite.center_x
+        agent_pos_y = self.player_sprite.center_y
+        agent_pos = np.array([agent_pos_x, agent_pos_y], dtype=np.float32)
         target_pos = self.end_of_map
-        end = False
+        target_pos = np.array([target_pos], dtype=np.float32)
+        game_time = np.array([self.time], dtype=np.float32)
 
-        coin_positions = self.get_something_positions(Consts.LAYER_NAME_COINS)
-        spikes_positions = self.get_something_positions(Consts.LAYER_NAME_DONT_TOUCH)
+        # Spikes
+        nearest_spikes_distance, nearest_spikes = self.calculate_nearest_something_distance(
+            Consts.LAYER_NAME_DONT_TOUCH)
+        nearest_spikes_distance = np.array([nearest_spikes_distance], dtype=np.float32)
 
-        coin_observation = [1 if agent_pos in coin_positions else 0]
-        spikes_observation = [1 if agent_pos in spikes_positions else 0]
+        if nearest_spikes is not None:
+            nearest_spikes = np.array([nearest_spikes[0], nearest_spikes[1]], dtype=np.float32)
+        else:
+            nearest_spikes = np.array([float('inf'), float('inf')], dtype=np.float32)
+
+        # Coins
+        nearest_coin_distance, nearest_coin = self.calculate_nearest_something_distance(Consts.LAYER_NAME_COINS)
+
+        if nearest_coin is not None:
+            nearest_coin = np.array([nearest_coin[0], nearest_coin[1]], dtype=np.float32)
+        else:
+            nearest_coin = np.array([float('inf'), float('inf')], dtype=np.float32)
+
         return {
             "agent": agent_pos,
             "target": target_pos,
-            "end": end,
-            "coins": coin_observation,  # Include coin information in the observation
-            "spikes": spikes_observation  # Include spikes information in the observation
+            "end": self.finished,
+            "time": game_time,
+            "spikes": nearest_spikes,
+            "coins": nearest_coin,
         }
 
     def get_info(self):
-        return {"distance": np.linalg.norm(self.player_sprite.center_x - self.end_of_map)}
+        return {"info": False}
 
     def get_reward(self):
 
         reward = 0
 
         if self.died:
-            self.died = False
-            reward += -15
+            reward += -25
 
-        # if self.score > self.old_score:
-        #     self.old_score = self.score
-        #     reward += 200
+        if self.score > self.old_score:
+            self.old_score = self.score
+            reward += 250
 
-        # print(self.player_sprite.center_x)
         if self.max_x > self.player_sprite.center_x:
-            reward += -10
-        elif self.max_x == self.player_sprite.center_x:
-            reward += -20
+            reward += -1
         elif self.max_x < self.player_sprite.center_x:
             self.max_x = self.player_sprite.center_x
-            reward += 5
+            reward += 25
+        else:
+            reward += -1
+            if self.physics_engine.can_jump():
+                reward += -10
 
-        if self.player_sprite.center_x >= self.end_of_map - 10:
-            reward += 20
+        if self.previous_position > self.player_sprite.center_x:
+            reward += 0
+        elif self.previous_position < self.player_sprite.center_x:
+            reward += 0
+        else:
+            reward += -10
+
+        self.previous_position = self.player_sprite.center_x
+
+        if self.player_sprite.center_x >= self.end_of_map - 11 and self.finished_level == False:
+            reward += 2500
+            print(f"koniec_levelu, nagroda: {reward}")
+
+            if self.time < self.min_time:
+                reward += 2500
+                self.min_time = self.time
+
+            self.finished_level = True  # Gains reward once per try
 
         # Calculate the distance to the nearest coin
-        nearest_coin_distance = self.calculate_nearest_something_distance(Consts.LAYER_NAME_COINS)
+        nearest_coin_distance, _ = self.calculate_nearest_something_distance(Consts.LAYER_NAME_COINS)
 
         # Define reward components for moving towards/away from coins
-        reward_near_coin = 30  # Reward for getting closer to coins
-        reward_away_coin = -10  # Penalty for moving away from coins
+        reward_near_coin = 15  # Reward for getting closer to coins
+        reward_away_coin = -1  # Penalty for moving away from coins
 
         # Calculate the reward based on the change in distance to the nearest coin
         delta_distance = self.previous_coin_distance - nearest_coin_distance
@@ -542,67 +567,86 @@ class MyGame(arcade.Window):
         if delta_distance > 0:
             reward += reward_near_coin
         elif delta_distance == 0:
-            reward += -20
+            reward += -1
         else:
             reward += reward_away_coin
 
         # Update the previous coin distance for the next step
         self.previous_coin_distance = nearest_coin_distance
 
-        # Calculate the distance to the nearest coin
-        nearest_spikes_distance = self.calculate_nearest_something_distance(Consts.LAYER_NAME_DONT_TOUCH)
+        # Calculate the distance to the nearest spike
+        nearest_spikes_distance, nearest_spikes = self.calculate_nearest_something_distance(
+            Consts.LAYER_NAME_DONT_TOUCH)
 
-        # Define reward components for moving towards/away from coins
-        reward_near_spikes = -1000  # Reward for getting closer to coins
-        reward_away_spikes = 10  # Penalty for moving away from coins
+        # Define reward components for moving towards/away from spikes
+        reward_near_spikes = -4000  # Penalty for getting closer to spikes
+        reward_away_spikes = 100  # Reward for moving away from spikes
 
-        # Calculate the reward based on the change in distance to the nearest coin
-        delta_distance = self.previous_spike_distance - nearest_spikes_distance
+        # Determine if the agent is moving closer to or away from spikes
+        if nearest_spikes is not None:
 
-        # Determine if the agent is moving closer to or away from coins
-        if abs(delta_distance) > 20:
-            reward += reward_near_spikes
-        elif delta_distance == 0:
-            reward += -20
-        else:
-            reward += reward_away_spikes
+            sprite_size = float(Consts.SPRITE_PIXEL_SIZE)
+            spikes_y = float(nearest_spikes[1])
+
+            # print(self.player_sprite.center_y, float(nearest_spikes[1]))
+            if abs(nearest_spikes_distance) < (sprite_size * 1.5):
+                if self.player_sprite.center_y >= (spikes_y + sprite_size * 0.5):
+                    reward += reward_near_spikes / (nearest_spikes_distance * 400)
+                else:
+                    reward += reward_away_spikes / 10
+            elif (sprite_size * 0.75) < abs(nearest_spikes_distance) < (sprite_size * 1.5):
+                if self.player_sprite.center_y >= (spikes_y + sprite_size * 0.5):
+                    reward += reward_away_spikes
+                else:
+                    reward += reward_near_spikes / nearest_spikes_distance
+            elif abs(nearest_spikes_distance) < (sprite_size * 0.75):
+                if self.player_sprite.center_y >= (spikes_y + sprite_size * 1.5):
+                    reward += reward_away_spikes
+                else:
+                    reward += reward_near_spikes / nearest_spikes_distance
+            else:
+                reward += 0
 
         # Update the previous coin distance for the next step
         self.previous_spike_distance = nearest_spikes_distance
 
-        # print(self.previous_coin_distance)
+        if self.end:
+            reward += 100
 
-        return reward
+        return reward * Consts.REWARD_SCALE
 
-    def is_done(self):
-        return False
+    def done(self):
+        return self.is_done
 
 
-class CustomGameEnvironment(gymnasium.Env):
+class CustomGameEnvironment(gym.Env):
     def __init__(self):
         super(CustomGameEnvironment, self).__init__()
 
         # Initialization of game
-        self.game = MyGame(Consts.SCREEN_WIDTH, Consts.SCREEN_HEIGHT, "Title")
+        self.game = MyGame(Consts.SCREEN_WIDTH, Consts.SCREEN_HEIGHT, "ML Agent")
         self.game.setup()
 
         # Define observation and action spaces
-        self.observation_space = gymnasium.spaces.Box(low=0, high=255, shape=(self.game.get_height(),
-                                                                              self.game.get_width()), dtype=np.uint8)
-        self.action_space = gymnasium.spaces.discrete.Discrete(Consts.NUMBER_OF_ACTIONS)
+        self.observation_space = spaces.Dict(
+            {
+                "agent": spaces.Box(0, 6144, shape=(2,), dtype=np.float32),
+                "target": spaces.Box(0, 6144, shape=(1,), dtype=np.float32),
+                "end": spaces.Discrete(2),
+                "time": spaces.Box(0, 1000, shape=(1,), dtype=np.float32),
+                "spikes": spaces.Box(0, 6144, shape=(2,), dtype=np.float32),
+                "coins": spaces.Box(0, 6144, shape=(2,), dtype=np.float32),
+            }
+        )
+
+        self.action_space = gym.spaces.discrete.Discrete(Consts.NUMBER_OF_ACTIONS)
 
         # self.window = None
 
-        self.epsilon = 0
-        self.q_values = defaultdict(lambda: np.zeros(5))
-        self.max_iterations = 20000
+        # self.epsilon = 0.1
+        # self.q_values = defaultdict(lambda: np.zeros(5))
+        self.max_iterations = Consts.MAX_ITERATIONS
         self.iterations = 0
-
-    def set_epsilon(self, epsilon):
-        self.epsilon = epsilon
-
-    # def set_window(self, window):
-    #     self.window = window
 
     def step(self, action):
         # Take action in the game
@@ -611,37 +655,57 @@ class CustomGameEnvironment(gymnasium.Env):
         # Get observation, reward, done, info from the game
         observation = self.game.get_observation()
         reward = self.game.get_reward()
-        done = self.game.is_done()
+        done = self.game.done()
         info = self.game.get_info()  # Additional information, if needed
 
         self.iterations += 1
+        # print(reward)
 
-        # if self.iterations > self.max_iterations:
-        #     print("reset")
-        #     # self.reset()
+        # print(observation, " ", reward)
 
-        return observation, reward, done, info
+        message = ""
+
+        if self.iterations > self.max_iterations:
+            if not Consts.LEARN:
+                message = "reset"
+                print("reset")
+            self.game.is_done = True
+
+        if self.game.died:
+            if not Consts.LEARN:
+                message = "dead"
+                print("dead")
+            self.game.is_done = True
+
+        if self.game.finished:
+            if not Consts.LEARN:
+                message = "finished"
+                print("finished")
+            self.game.is_done = True
+
+        info = {"message": message}
+
+        return observation, reward, done, False, info
 
     def reset(self, **kwargs):
         # Reset the game and return initial observation
         self.iterations = 0
         self.game.setup()
         # self.window(self.game)
-        return self.game.get_info()
+        observation = self.game.get_observation()
+        info = self.game.get_info()  # Additional information, if needed
+
+        return observation, info
 
     def render(self, mode='human'):
         self.game.dispatch_events()
-        self.game._dispatch_updates(60)
-        self.game.on_draw()  # Draw the frame
-        self.game.flip()  # Display the frame
+        self.game._dispatch_updates(1)
+
+        if not Consts.LEARN:
+            self.game.on_draw()  # Draw the frame
+            self.game.flip()  # Display the frame
         # self.game.update(1/60)  # Update the game state
 
     def close(self):
         # Close any resources when done
         self.game.setup()
-
-    def get_action(self, do):
-        if np.random.random() < self.epsilon:
-            return np.random.randint(1, 6)
-        else:
-            return do
